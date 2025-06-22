@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Advanced Online Video Player</title>
+<style>
+  /* Reset */
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0; 
+    background: #121212;
+    color: #fff;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+  }
+  .player {
+    position: relative;
+    max-width: 900px;
+    width: 95%;
+    background: #000;
+    border-radius: 10px;
+    overflow: hidden;
+    user-select: none;
+  }
+  video {
+    width: 100%;
+    display: block;
+    background: black;
+  }
+  .controls {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    background: rgba(20, 20, 20, 0.75);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 12px 10px;
+    gap: 8px;
+  }
+  button, select, input[type="range"] {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  button:hover, select:hover, input[type="range"]:hover {
+    color: #e50914;
+  }
+  button:focus, select:focus, input[type="range"]:focus {
+    outline: 2px solid #e50914;
+  }
+  .play-pause {
+    font-size: 20px;
+    width: 36px;
+  }
+  .time {
+    font-size: 13px;
+    width: 48px;
+    text-align: center;
+    user-select: none;
+  }
+  .progress-container {
+    flex-grow: 1;
+  }
+  .progress-container input[type="range"] {
+    width: 100%;
+    height: 8px;
+    border-radius: 5px;
+    cursor: pointer;
+    -webkit-appearance: none;
+    background: #444;
+  }
+  .progress-container input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    background: #e50914;
+    border-radius: 50%;
+    cursor: pointer;
+    margin-top: -3px;
+  }
+  #volume {
+    width: 130px;
+    height: 6px;
+    border-radius: 4px;
+    background: #444;
+    cursor: pointer;
+  }
+  #volume::-webkit-slider-thumb {
+    width: 12px;
+    height: 12px;
+    background: #e50914;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  select#playbackRate {
+    background: #222;
+    border-radius: 4px;
+    padding: 3px 6px;
+  }
+  .subtitle-toggle {
+    font-size: 13px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 5px;
+    padding: 2px 8px;
+  }
+  @media (max-width: 600px) {
+    .controls {
+      gap: 5px;
+      padding: 8px 6px;
+    }
+    .play-pause {
+      font-size: 18px;
+      width: 30px;
+    }
+    #volume {
+      width: 100px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="player" tabindex="0" aria-label="Advanced video player">
+  <video id="video" preload="metadata" poster="poster.jpg" tabindex="-1">
+    <source src="Movies/Housefull_5A_2025_Hindi_Full_Movie_1080p_CAMRip_(FilmyZilla.vin).mp4" type="video/mp4" />
+    <track label="English" kind="subtitles" srclang="en" src="subtitles.vtt" default />
+    Your browser does not support the video tag.
+  </video>
+
+  <div class="controls" role="group" aria-label="Video controls">
+    <button id="playPause" class="play-pause" aria-label="Play/Pause" title="Play/Pause">▶️</button>
+    <span id="currentTime" class="time" aria-live="off"></span>
+    <div class="progress-container">
+      <input type="range" id="progressBar" min="0" step="0.1" value="0" aria-label="Seek video" />
+    </div>
+    <span id="duration" class="time"></span>
+    <input type="range" id="volume" min="0" max="1" step="0.01" value="0.5" aria-label="Volume control" title="Volume" />
+    <select id="playbackRate" aria-label="Playback speed" title="Playback Speed">
+      <option value="0.5">0.5×</option>
+      <option value="0.75">0.75×</option>
+      <option value="1" selected>1×</option>
+      <option value="1.25">1.25×</option>
+      <option value="1.5">1.5×</option>
+      <option value="2">2×</option>
+    </select>
+    <button id="fullscreenBtn" aria-label="Fullscreen" title="Fullscreen">⛶</button>
+    <button id="pipBtn" aria-label="Picture in Picture" title="Picture in Picture">📺</button>
+    <button id="subtitleToggle" class="subtitle-toggle" aria-pressed="true" title="Toggle subtitles">Subtitles: On</button>
+  </div>
+</div>
+
+<script>
+  const video = document.getElementById('video');
+  const playPauseBtn = document.getElementById('playPause');
+  const progressBar = document.getElementById('progressBar');
+  const currentTimeEl = document.getElementById('currentTime');
+  const durationEl = document.getElementById('duration');
+  const volumeSlider = document.getElementById('volume');
+  const playbackRateSelect = document.getElementById('playbackRate');
+  const fullscreenBtn = document.getElementById('fullscreenBtn');
+  const pipBtn = document.getElementById('pipBtn');
+  const subtitleToggleBtn = document.getElementById('subtitleToggle');
+  const track = video.textTracks[0];
+
+  // Format seconds as MM:SS
+  function formatTime(seconds) {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  }
+
+  // Update progress bar and time displays
+  function updateProgress() {
+    progressBar.value = video.currentTime;
+    currentTimeEl.textContent = formatTime(video.currentTime);
+  }
+
+  // Load metadata (duration)
+  video.addEventListener('loadedmetadata', () => {
+    progressBar.max = video.duration;
+    durationEl.textContent = formatTime(video.duration);
+  });
+
+  video.addEventListener('timeupdate', updateProgress);
+
+  // Play/pause toggle
+  playPauseBtn.addEventListener('click', () => {
+    if (video.paused) {
+      video.play();
+      playPauseBtn.textContent = '⏸️';
+    } else {
+      video.pause();
+      playPauseBtn.textContent = '▶️';
+    }
+  });
+
+  // Seek video on progress bar input
+  progressBar.addEventListener('input', () => {
+    video.currentTime = progressBar.value;
+  });
+
+  // Volume control
+  volumeSlider.addEventListener('input', () => {
+    video.volume = volumeSlider.value;
+  });
+
+  // Playback speed control
+  playbackRateSelect.addEventListener('change', () => {
+    video.playbackRate = playbackRateSelect.value;
+  });
+
+  // Fullscreen toggle
+  fullscreenBtn.addEventListener('click', () => {
+    if (!document.fullscreenElement) {
+      video.parentElement.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+  });
+
+  // Picture-in-Picture toggle
+  pipBtn.addEventListener('click', async () => {
+    if (document.pictureInPictureElement) {
+      await document.exitPictureInPicture();
+    } else if (video !== document.pictureInPictureElement) {
+      try {
+        await video.requestPictureInPicture();
+      } catch (error) {
+        alert('Picture-in-Picture not supported in this browser.');
+      }
+    }
+  });
+
+  // Subtitles toggle
+  subtitleToggleBtn.addEventListener('click', () => {
+    if (track.mode === 'showing') {
+      track.mode = 'disabled';
+      subtitleToggleBtn.textContent = 'Subtitles: Off';
+      subtitleToggleBtn.setAttribute('aria-pressed', 'false');
+    } else {
+      track.mode = 'showing';
+      subtitleToggleBtn.textContent = 'Subtitles: On';
+      subtitleToggleBtn.setAttribute('aria-pressed', 'true');
+    }
+  });
+
+  // Keyboard shortcuts
+  document.querySelector('.player').addEventListener('keydown', e => {
+    switch (e.key) {
+      case ' ':
+      case 'k':
+        e.preventDefault();
+        playPauseBtn.click();
+        break;
+      case 'ArrowRight':
+        video.currentTime = Math.min(video.duration, video.currentTime + 5);
+        break;
+      case 'ArrowLeft':
+        video.currentTime = Math.max(0, video.currentTime - 5);
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        video.volume = Math.min(1, video.volume + 0.05);
+        volumeSlider.value = video.volume;
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        video.volume = Math.max(0, video.volume - 0.05);
+        volumeSlider.value = video.volume;
+        break;
+      case 'f':
+        fullscreenBtn.click();
+        break;
+      case 'p':
+        pipBtn.click();
+        break;
+      case 's':
+        subtitleToggleBtn.click();
+        break;
+    }
+  });
+
+  // Initialize
+  video.volume = 0.5;
+  track.mode = 'showing';
+</script>
+
+</body>
+</html>
